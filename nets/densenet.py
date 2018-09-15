@@ -24,19 +24,19 @@ def bn_act_conv_drp(current, num_outputs, kernel_size, scope='block'):
 def block(net, layers, growth, scope='block'):
     for idx in range(layers):
         bottleneck = bn_act_conv_drp(net, 4 * growth, [1, 1],
-                                     scope=scope + '_conv1x1' + str(idx))
+                                     scope=scope + '_conv1x1_' + str(idx))
         tmp = bn_act_conv_drp(bottleneck, growth, [3, 3],
-                              scope=scope + '_conv3x3' + str(idx))
+                              scope=scope + '_conv3x3_' + str(idx))
         net = tf.concat(axis=3, values=[net, tmp])
     return net
 
 
 def transition(net, num_outputs, scope='transition'):
-    #net = bn_act_conv_drp(net, num_outputs, [1, 1], scope=scope + '_conv1x1')
-    #net = slim.avg_pool2d(net, [2, 2], stride=2, scope=scope + '_avgpool')
-    net = slim.batch_norm(net, scope=scope + '_bn')
-    net = slim.conv2d(net, num_outputs, [1, 1], scope=scope + '_conv')
+    net = bn_act_conv_drp(net, num_outputs, [1, 1], scope=scope + '_conv1x1')
     net = slim.avg_pool2d(net, [2, 2], stride=2, scope=scope + '_avgpool')
+    #net = slim.batch_norm(net, scope=scope + '_bn')
+    #net = slim.conv2d(net, num_outputs, [1, 1], scope=scope + '_conv')
+    #net = slim.avg_pool2d(net, [2, 2], stride=2, scope=scope + '_avgpool')
     return net
 
 
@@ -74,25 +74,42 @@ def densenet(images, num_classes=1001, is_training=False,
             ##########################
             # Put your code here.
             # 224 x 224,输如图片的尺寸.经过卷积池化后降低
-            net = images
-            net = slim.conv2d(net, 2 * growth, 7, stride=2, scope='Conv2d_0')
+            end_point = 'Conv2d_0'
+            net = slim.conv2d(images, 2 * growth, 7, stride=2, scope=end_point)
+            end_points[end_point] = net
+            end_point = 'MaxPool_0'
             net = slim.max_pool2d(
-                net, 3, stride=2, padding='SAME', scope='MaxPool_0')
+                net, 3, stride=2, padding='SAME', scope=end_point)
+            end_points[end_point] = net
 
             # 56 x 56,Block1
-            net = block(net, 6, growth, scope='Block1')
-            net = transition(net, reduce_dim(net), scope='Transition1')
+            end_point = 'Block1'
+            net = block(net, 6, growth, scope=end_point)
+            end_points[end_point] = net
+            end_point = 'Transition1'
+            net = transition(net, reduce_dim(net), scope=end_point)
+            end_points[end_point] = net
 
             # 28 x 28, Block2
-            net = block(net, 12, growth, scope='Block2')
-            net = transition(net, reduce_dim(net), scope='Transition2')
+            end_point = 'Block2'
+            net = block(net, 12, growth, scope=end_point)
+            end_points[end_point] = net
+            end_point = 'Transition2'
+            net = transition(net, reduce_dim(net), scope=end_point)
+            end_points[end_point] = net
 
             # block3
-            net = block(net, 24, growth, scope='Block3')
-            net = transition(net, reduce_dim(net), scope='Transition3')
+            end_point = 'Block3'
+            net = block(net, 24, growth, scope=end_point)
+            end_points[end_point] = net
+            end_point = 'Transition3'
+            net = transition(net, reduce_dim(net), scope=end_point)
+            end_points[end_point] = net
 
             # block4
-            net = block(net, 16, growth, scope='Block4')
+            end_point = 'Block4'
+            net = block(net, 16, growth, scope=end_point)
+            end_points[end_point] = net
 
             net = slim.batch_norm(net, scope='last_batch_norm_relu')
             net = tf.nn.relu(net)
